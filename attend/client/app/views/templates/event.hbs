@@ -1,0 +1,8 @@
+<h1>{{title}}</h1>
+
+<p>{{event.title}} has attendence records for the following days:</p>
+<ul>
+    {{#each dates}}
+    <li><a href="#/event/{{../event.id}}/{{.}}">{{.}}</a></li>
+    {{/each}}
+</ul>

@@ -1,0 +1,7 @@
+<h1>Attendance for {{event.title}} on {{date}}</h1>
+
+<ul>
+    {{#each contacts}}
+    <li><a href="#/contact/{{id}}">{{display_name}}</a></li>
+    {{/each}}
+</ul>

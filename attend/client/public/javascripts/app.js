@@ -107,7 +107,6 @@ window.require.define({"application": function(exports, require, module) {
   _ref = ["records", "contacts", "events"];
   for (_i = 0, _len = _ref.length; _i < _len; _i++) {
     collection = _ref[_i];
-    Application[collection].on("all", debug);
     Application[collection].App = Application;
   }
   
@@ -357,13 +356,6 @@ window.require.define({"lib/router": function(exports, require, module) {
       model = app.contacts.getOrFetch(cid);
       event = app.events.getOrFetch(eid);
       collection = app.records.getByContact(cid);
-      console.log({
-        model: model,
-        event: event,
-        collection: collection,
-        cid: cid,
-        eid: eid
-      });
       view = new contactEventView({
         model: model,
         event: event,
@@ -386,12 +378,17 @@ window.require.define({"lib/router": function(exports, require, module) {
     Router.prototype.eventDate = function(eid, date) {
       var collection, model, view;
       model = app.events.getOrFetch(eid);
-      collection = app.records.getByEvent(eid);
+      collection = app.records.getByEvent(eid).getByDate(date);
       view = new eventDateView({
         model: model,
         collection: collection,
         date: date
       });
+      window.dave3 = {
+        model: model,
+        collection: collection,
+        date: date
+      };
       return this.render(view);
     };
 
@@ -662,46 +659,58 @@ window.require.define({"models/model": function(exports, require, module) {
 }});
 
 window.require.define({"models/record": function(exports, require, module) {
-  var EventModel, Model,
+  var Model, RecordModel,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
   Model = require("./model");
 
-  module.exports = EventModel = (function(_super) {
+  module.exports = RecordModel = (function(_super) {
 
-    __extends(EventModel, _super);
+    __extends(RecordModel, _super);
 
-    function EventModel() {
-      return EventModel.__super__.constructor.apply(this, arguments);
+    function RecordModel() {
+      return RecordModel.__super__.constructor.apply(this, arguments);
     }
 
-    EventModel.prototype.methodMap = {
+    RecordModel.prototype.methodMap = {
       create: "create_contact_record",
       update: "set_contact_record",
       read: "get_contact_record",
       "delete": "delete_contact_record"
     };
 
-    EventModel.prototype.entity = "attend";
+    RecordModel.prototype.entity = "attend";
 
-    EventModel.prototype.toJSON = function() {
+    RecordModel.prototype.toJSON = function() {
       var data;
-      data = EventModel.__super__.toJSON.apply(this, arguments);
+      data = RecordModel.__super__.toJSON.apply(this, arguments);
       if (!_.isString(data.date)) {
         data.date = data.date.toString("yyyy-MM-dd");
       }
       return data;
     };
 
-    return EventModel;
+    RecordModel.prototype.initialize = function() {
+      var _this = this;
+      this.relatedEvent = this.collection.App.events.getOrFetch(this.get("event_id"));
+      this.relatedEvent.on("change", function() {
+        return _this.trigger("change");
+      });
+      this.relatedContact = this.collection.App.contacts.getOrFetch(this.get("contact_id"));
+      return this.relatedContact.on("change", function() {
+        return _this.trigger("change");
+      });
+    };
+
+    return RecordModel;
 
   })(Model);
   
 }});
 
 window.require.define({"models/records": function(exports, require, module) {
-  var $, Collection, Record, Records,
+  var $, Collection, Record, Records, contactFetches, eventFetches,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
@@ -712,6 +721,10 @@ window.require.define({"models/records": function(exports, require, module) {
   Record = require("./record");
 
   Collection = require("./collection");
+
+  contactFetches = [];
+
+  eventFetches = [];
 
   module.exports = Records = (function(_super) {
 
@@ -724,19 +737,22 @@ window.require.define({"models/records": function(exports, require, module) {
 
     Records.prototype.model = Record;
 
-    Records.prototype.contactFetches = [];
-
-    Records.prototype.eventFetches = [];
+    Records.prototype.makeChild = function() {
+      var child;
+      child = new Records;
+      child.app = this.app;
+      return child;
+    };
 
     Records.prototype.getByContact = function(contact_id) {
       var filtered;
-      filtered = new Records;
-      if (__indexOf.call(this.contactFetches, contact_id) >= 0) {
-        filtered.add(this.where({
+      filtered = this.makeChild();
+      if (__indexOf.call(contactFetches, contact_id) >= 0) {
+        filtered.add(this.App.records.where({
           contact_id: contact_id
         }));
       } else {
-        this.contactFetches.push(contact_id);
+        contactFetches.push(contact_id);
         this.fetch({
           contact_id: contact_id
         }, filtered);
@@ -746,18 +762,26 @@ window.require.define({"models/records": function(exports, require, module) {
 
     Records.prototype.getByEvent = function(event_id) {
       var filtered;
-      filtered = new Records;
-      if (__indexOf.call(this.eventFetches, event_id) >= 0) {
-        filtered.add(this.where({
+      filtered = this.makeChild();
+      if (__indexOf.call(eventFetches, event_id) >= 0) {
+        filtered.add(this.App.records.where({
           event_id: event_id
         }));
       } else {
-        this.eventFetches.push(event_id);
+        eventFetches.push(event_id);
         this.fetch({
           event_id: event_id
         }, filtered);
       }
       return filtered;
+    };
+
+    Records.prototype.getByDate = function(date) {
+      var filtered;
+      return filtered = new Records(this.filter(function(model) {
+        console.log(date, model.get("date"));
+        return date === model.get("date");
+      }));
     };
 
     Records.prototype.getEvents = function() {
@@ -788,7 +812,11 @@ window.require.define({"models/records": function(exports, require, module) {
       }).call(this));
     };
 
-    Records.prototype.fetch = function(query, filtered) {
+    Records.prototype.getDates = function() {
+      return _.unique(this.pluck("date"));
+    };
+
+    Records.prototype.fetch = function(query, filtered, done) {
       var base, url,
         _this = this;
       if (query == null) {
@@ -800,32 +828,32 @@ window.require.define({"models/records": function(exports, require, module) {
       query.action = "get_contact_record";
       query.json = 1;
       return $.getJSON(url, query, function(records) {
+        var model, record, _i, _len, _results;
         if (_.isArray(records)) {
-          _this.add(records);
-          if (filtered) {
-            filtered.add(records);
-            return _this.getRelated(filtered);
+          _results = [];
+          for (_i = 0, _len = records.length; _i < _len; _i++) {
+            record = records[_i];
+            model = _this.App.records.get(record.id);
+            if (!model) {
+              _this.App.records.add(record);
+              model = _this.App.records.get(record.id);
+            }
+            if (!_this.get(model.id)) {
+              _this.add(model);
+            }
+            if (filtered) {
+              if (!filtered.get(model.id)) {
+                _results.push(filtered.add(model));
+              } else {
+                _results.push(void 0);
+              }
+            } else {
+              _results.push(void 0);
+            }
           }
+          return _results;
         }
       });
-    };
-
-    Records.prototype.getRelated = function(filtered) {
-      var model, _i, _len, _ref, _results;
-      _ref = filtered.models;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        model = _ref[_i];
-        model.relatedEvent = this.App.events.getOrFetch(model.get("event_id"));
-        model.relatedEvent.on("change", function() {
-          return model.trigger("change");
-        });
-        model.relatedContact = this.App.contacts.getOrFetch(model.get("contact_id"));
-        _results.push(model.relatedContact.on("change", function() {
-          return model.trigger("change");
-        }));
-      }
-      return _results;
     };
 
     return Records;
@@ -911,8 +939,6 @@ window.require.define({"views/contactEvent": function(exports, require, module) 
         contact: this.model.toJSON(),
         event: this.options.event.toJSON()
       };
-      console.log(data);
-      window.dave2 = this;
       return data;
     };
 
@@ -963,6 +989,7 @@ window.require.define({"views/contactEvent": function(exports, require, module) 
           model: record
         });
         this.$('records').append(view.render().el);
+        this.date = null;
       }
       return false;
     };
@@ -1001,11 +1028,13 @@ window.require.define({"views/contactEventDate": function(exports, require, modu
 }});
 
 window.require.define({"views/event": function(exports, require, module) {
-  var Event, View,
+  var Event, View, template,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
   View = require("./view");
+
+  template = require("./templates/event");
 
   module.exports = Event = (function(_super) {
 
@@ -1015,9 +1044,14 @@ window.require.define({"views/event": function(exports, require, module) {
       return Event.__super__.constructor.apply(this, arguments);
     }
 
+    Event.prototype.template = template;
+
     Event.prototype.getRenderData = function() {
       return {
-        event: this.model.toJSON()
+        title: "Event Attendence Records",
+        event: this.model.toJSON(),
+        dates: this.collection.getDates(),
+        contacts: this.collection.getContacts()
       };
     };
 
@@ -1028,11 +1062,13 @@ window.require.define({"views/event": function(exports, require, module) {
 }});
 
 window.require.define({"views/eventDate": function(exports, require, module) {
-  var EventDate, View,
+  var EventDate, View, template,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
   View = require("./view");
+
+  template = require("./templates/eventDate");
 
   module.exports = EventDate = (function(_super) {
 
@@ -1042,9 +1078,23 @@ window.require.define({"views/eventDate": function(exports, require, module) {
       return EventDate.__super__.constructor.apply(this, arguments);
     }
 
+    EventDate.prototype.template = template;
+
     EventDate.prototype.getRenderData = function() {
+      var model;
       return {
-        title: "Event Date"
+        event: this.model.toJSON(),
+        contacts: (function() {
+          var _i, _len, _ref, _results;
+          _ref = this.collection.getContacts();
+          _results = [];
+          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+            model = _ref[_i];
+            _results.push(model.toJSON());
+          }
+          return _results;
+        }).call(this),
+        date: this.options.date
       };
     };
 
@@ -1218,6 +1268,102 @@ window.require.define({"views/templates/default": function(exports, require, mod
     if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
     else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "title", { hash: {} }); }
     buffer += escapeExpression(stack1) + "</h1>";
+    return buffer;});
+}});
+
+window.require.define({"views/templates/event": function(exports, require, module) {
+  module.exports = Handlebars.template(function (Handlebars,depth0,helpers,partials,data) {
+    helpers = helpers || Handlebars.helpers;
+    var buffer = "", stack1, stack2, foundHelper, tmp1, self=this, functionType="function", helperMissing=helpers.helperMissing, undef=void 0, escapeExpression=this.escapeExpression;
+
+  function program1(depth0,data,depth1) {
+    
+    var buffer = "", stack1;
+    buffer += "\n    <li><a href=\"#/event/";
+    foundHelper = helpers.event;
+    stack1 = foundHelper || depth1.event;
+    stack1 = (stack1 === null || stack1 === undefined || stack1 === false ? stack1 : stack1.id);
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "...event.id", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "/";
+    stack1 = depth0;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, ".", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "\">";
+    stack1 = depth0;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, ".", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "</a></li>\n    ";
+    return buffer;}
+
+    buffer += "<h1>";
+    foundHelper = helpers.title;
+    stack1 = foundHelper || depth0.title;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "title", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "</h1>\n\n<p>";
+    foundHelper = helpers.event;
+    stack1 = foundHelper || depth0.event;
+    stack1 = (stack1 === null || stack1 === undefined || stack1 === false ? stack1 : stack1.title);
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "event.title", { hash: {} }); }
+    buffer += escapeExpression(stack1) + " has attendence records for the following days:</p>\n<ul>\n    ";
+    foundHelper = helpers.dates;
+    stack1 = foundHelper || depth0.dates;
+    stack2 = helpers.each;
+    tmp1 = self.programWithDepth(program1, data, depth0);
+    tmp1.hash = {};
+    tmp1.fn = tmp1;
+    tmp1.inverse = self.noop;
+    stack1 = stack2.call(depth0, stack1, tmp1);
+    if(stack1 || stack1 === 0) { buffer += stack1; }
+    buffer += "\n</ul>";
+    return buffer;});
+}});
+
+window.require.define({"views/templates/eventDate": function(exports, require, module) {
+  module.exports = Handlebars.template(function (Handlebars,depth0,helpers,partials,data) {
+    helpers = helpers || Handlebars.helpers;
+    var buffer = "", stack1, stack2, foundHelper, tmp1, self=this, functionType="function", helperMissing=helpers.helperMissing, undef=void 0, escapeExpression=this.escapeExpression;
+
+  function program1(depth0,data) {
+    
+    var buffer = "", stack1;
+    buffer += "\n    <li><a href=\"#/contact/";
+    foundHelper = helpers.id;
+    stack1 = foundHelper || depth0.id;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "id", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "\">";
+    foundHelper = helpers.display_name;
+    stack1 = foundHelper || depth0.display_name;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "display_name", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "</a></li>\n    ";
+    return buffer;}
+
+    buffer += "<h1>Attendance for ";
+    foundHelper = helpers.event;
+    stack1 = foundHelper || depth0.event;
+    stack1 = (stack1 === null || stack1 === undefined || stack1 === false ? stack1 : stack1.title);
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "event.title", { hash: {} }); }
+    buffer += escapeExpression(stack1) + " on ";
+    foundHelper = helpers.date;
+    stack1 = foundHelper || depth0.date;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "date", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "</h1>\n\n<ul>\n    ";
+    foundHelper = helpers.contacts;
+    stack1 = foundHelper || depth0.contacts;
+    stack2 = helpers.each;
+    tmp1 = self.program(1, program1, data);
+    tmp1.hash = {};
+    tmp1.fn = tmp1;
+    tmp1.inverse = self.noop;
+    stack1 = stack2.call(depth0, stack1, tmp1);
+    if(stack1 || stack1 === 0) { buffer += stack1; }
+    buffer += "\n</ul>";
     return buffer;});
 }});
 

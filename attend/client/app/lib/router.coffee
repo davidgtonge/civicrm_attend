@@ -29,7 +29,6 @@ module.exports = class Router extends Backbone.Router
     model = app.contacts.getOrFetch(cid)
     event = app.events.getOrFetch(eid)
     collection = app.records.getByContact(cid)
-    console.log {model, event, collection, cid, eid}
     view = new contactEventView {model, event, collection}
     @render view
 
@@ -41,8 +40,10 @@ module.exports = class Router extends Backbone.Router
 
   eventDate: (eid, date) ->
     model = app.events.getOrFetch(eid)
-    collection = app.records.getByEvent(eid)
+    collection = app.records.getByEvent(eid).getByDate(date)
     view = new eventDateView {model, collection, date}
+
+    window.dave3 = {model,  collection, date}
     @render view
 
   event: (eid) ->

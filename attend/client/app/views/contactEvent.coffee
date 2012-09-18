@@ -9,8 +9,6 @@ module.exports = class ContactEvent extends View
       title:"Contact Event"
       contact: @model.toJSON()
       event: @options.event.toJSON()
-    console.log data
-    window.dave2 = @
     data
 
   events:
@@ -30,6 +28,7 @@ module.exports = class ContactEvent extends View
         event_id:@options.event.id
       view = new RecordView {model:record}
       @$('records').append view.render().el
+      @date = null
     false
 
 

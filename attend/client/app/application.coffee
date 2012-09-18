@@ -24,5 +24,5 @@ module.exports = Application
 window.dave = Application
 
 for collection in  ["records","contacts","events"]
-  Application[collection].on "all", debug
+  #Application[collection].on "all", debug
   Application[collection].App = Application
