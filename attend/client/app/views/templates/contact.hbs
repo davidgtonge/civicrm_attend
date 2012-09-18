@@ -1,0 +1,8 @@
+<h1>{{title}}</h1>
+
+<p>{{contact.display_name}} has attended the following events:</p>
+<ul>
+    {{#each events}}
+    <li><a href="#/contact/{{../contact.id}}/{{id}}">{{event_title}}</a></li>
+    {{/each}}
+</ul>

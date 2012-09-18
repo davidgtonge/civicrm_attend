@@ -1,0 +1,92 @@
+<?php 
+
+// Event Edit - Add the option to track attendence
+// Now need to save this to the database.
+//
+// I think for the other stuff its best that we build an api
+// Add a new entity type - Attendence
+// Then we can do some nice querying of data,
+// by form, by date, by person
+// We can then display this fairly easily
+// So the next step is to create the api
+//
+// Event Detail Page - Click to load and edit attendence (perhaps via ajax)
+//
+// Contact Page - Make a new Attendence Tab
+// 
+//
+//
+
+
+error_reporting(E_ALL);
+
+
+function civiattend_civicrm_buildForm($formName, &$form) {
+
+  if($formName == "CRM_Event_Form_ManageEvent_EventInfo"){
+    require_once("api/api.php");
+    $is_attend = civicrm_api('attend', 'getEventFlag', array('version'=>3, 'eid'=>123));
+    $form->addElement('checkbox', 'is_attend', ts('Do you want to track attendence?') );  
+    $e =& $form->getElement('is_attend');
+    $e->setValue($is_attend);  
+  }
+  
+}
+
+function civiattend_civicrm_postProcess($formName, &$form){
+  if($formName == "CRM_Event_Form_ManageEvent_EventInfo"){
+    require_once("api/api.php");
+    $e =& $form->getElement('is_attend');
+    $is_attend = $e->getValue();
+    civicrm_api('attend','setEventFlag', array(
+      'version' => 3,
+      'eid' => 123,
+      'is_attend' => $is_attend
+    ));
+  }
+}
+
+function civiattend_civicrm_alterContent(&$content, $context, $tplName){
+    // Will only be initialsed for certain pages
+    global $base_url;
+    $script_url = $base_url . "/sites/all/modules/attend/client/public/javascripts/";
+    $style_url = $base_url . "/sites/all/modules/attend/client/public/stylesheets/app.css";
+    $scripts =  "<script type='text/javascript' src='{$script_url}vendor.js'></script>";
+    $scripts  .= "<script type='text/javascript' src='{$script_url}app.js'></script>";
+    $scripts .= "<link rel='stylesheet' href='{$style_url}' />";
+
+    switch($tplName){
+        case "CRM/Event/Page/ManageEvent.tpl":
+            // This page shows a list of events = need to add a
+            $content .= $scripts . "<script>require('dom/addEventButton');</script>";
+            break;
+        case "CRM/Contact/Page/View/Summary.tpl":
+            $content .= $scripts . "<script>require('dom/addContactButton');</script>";
+
+
+    }
+
+    dpm($tplName);
+
+}
+
+# Database
+# Three New Tables
+# One with event metadata
+# One contains:
+# event_id, is_attend_flag
+#
+# So lets just use the two tables
+# But when we get event data we do a query for all dates for that event
+#
+# array of dates  
+#
+# Other contains:
+# event_id, date, contact_id
+#
+#
+#
+#
+#
+
+

@@ -1,0 +1,6 @@
+name = CiviCRM Attendence Module
+description = Module to manage attendence in CiviCRM 
+dependencies[] = civicrm 
+package = CiviCRM 
+core = 7.x 
+version = 1.0
