@@ -26,6 +26,7 @@ class Async
           @check()
 
 
+
 # The Actual Router
 module.exports = class Router extends Backbone.Router
 
@@ -50,6 +51,7 @@ module.exports = class Router extends Backbone.Router
       app.events.getOrFetch(eid, cb)
     collection = app.records.getByContact(cid)
     async.run =>
+      # Test
       view = new contactEventView {model:async.model, event:async.event, collection}
       @render view
 
