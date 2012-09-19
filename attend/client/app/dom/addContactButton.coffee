@@ -11,4 +11,3 @@ cj ->
   link.click ->
     window.location.hash = "/contact/#{id}"
     require "../initialize"
-    alert "show attendance for cid #{id}"

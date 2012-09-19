@@ -10,7 +10,7 @@ module.exports = class Records extends Collection
 
   makeChild: ->
     child = new Records
-    child.app = @app
+    child.App = @App
     child
 
   getByContact: (contact_id) ->

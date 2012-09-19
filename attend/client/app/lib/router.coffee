@@ -7,6 +7,23 @@ contactView = require "../views/contact"
 eventDateView = require "../views/eventDate"
 eventView = require "../views/event"
 
+class Async
+  counter:0
+  add: (name, method) ->
+    @counter += 1
+    @fns[name] = method
+
+  fns:{}
+  check: ->
+    @finish() if @counter is 0
+
+  run: (@finish) ->
+    for name, fn of @fns
+      do (name, fn) =>
+        fn (result) =>
+          @[name] = result
+          @counter -= 1
+          @check()
 
 
 # The Actual Router
@@ -26,31 +43,42 @@ module.exports = class Router extends Backbone.Router
 
 
   contactEvent: (cid, eid) ->
-    model = app.contacts.getOrFetch(cid)
-    event = app.events.getOrFetch(eid)
+    async = new Async
+    async.add "model", (cb) ->
+      app.contacts.getOrFetch(cid, cb)
+    async.add "event", (cb) ->
+      app.events.getOrFetch(eid, cb)
     collection = app.records.getByContact(cid)
-    view = new contactEventView {model, event, collection}
-    @render view
+    async.run =>
+      view = new contactEventView {model:async.model, event:async.event, collection}
+      @render view
+
 
   contact: (cid) ->
-    model = app.contacts.getOrFetch(cid)
+    async = new Async
+    async.add "model", (cb) -> app.contacts.getOrFetch(cid, cb)
     collection = app.records.getByContact(cid)
-    view = new contactView {model, collection}
-    @render view
+    async.run =>
+      view = new contactView {model:async.model, collection}
+      @render view
 
   eventDate: (eid, date) ->
-    model = app.events.getOrFetch(eid)
+    async = new Async
+    async.add "model", (cb) -> app.events.getOrFetch(eid, cb)
     collection = app.records.getByEvent(eid).getByDate(date)
-    view = new eventDateView {model, collection, date}
-
-    window.dave3 = {model,  collection, date}
-    @render view
+    contacts = app.contacts.getByEvent(eid)
+    async.run =>
+      view = new eventDateView {model:async.model, collection, contacts, date}
+      @render view
 
   event: (eid) ->
-    model = app.events.getOrFetch(eid)
+    async = new Async
+    async.add "model", (cb) -> app.events.getOrFetch(eid, cb)
     collection = app.records.getByEvent(eid)
-    view = new eventView {model, collection}
-    @render view
+    contacts = app.contacts.getByEvent(eid)
+    async.run =>
+      view = new eventView {model:async.model, collection, contacts}
+      @render view
 
   render: (view) ->
     @$el.dialog "close"

@@ -1,11 +1,19 @@
 # Base class for all collections.
 module.exports = class Collection extends Backbone.Collection
 
-  getOrFetch: (id) ->
+  getOrFetch: (id, callback) ->
     model = @get id
-    unless model
+    if model
+      callback model
+    else
       model = new @model {id}
-      model.fetch()
-      @add model
-    model
+      model.fetch
+        success: =>
+          cached = @get id
+          if cached
+            cached.set model.toJSON()
+            callback cached
+          else
+            @add model
+            callback model
 

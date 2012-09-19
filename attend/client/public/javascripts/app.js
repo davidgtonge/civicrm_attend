@@ -123,8 +123,7 @@ window.require.define({"dom/addContactButton": function(exports, require, module
     id = url.charAt(url.length - 1);
     return link.click(function() {
       window.location.hash = "/contact/" + id;
-      require("../initialize");
-      return alert("show attendance for cid " + id);
+      return require("../initialize");
     });
   });
   
@@ -140,8 +139,7 @@ window.require.define({"dom/addEventButton": function(exports, require, module) 
     id = url.charAt(url.length - 1);
     return container.find('#sc_attend').click(function() {
       window.location.hash = "/event/" + id;
-      require("../initialize");
-      return alert("show attedance for eid: " + id);
+      return require("../initialize");
     });
   });
   
@@ -313,7 +311,7 @@ window.require.define({"lib/cache": function(exports, require, module) {
 }});
 
 window.require.define({"lib/router": function(exports, require, module) {
-  var $, Router, app, contactEventView, contactView, eventDateView, eventView,
+  var $, Async, Router, app, contactEventView, contactView, eventDateView, eventView,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -328,6 +326,48 @@ window.require.define({"lib/router": function(exports, require, module) {
   eventDateView = require("../views/eventDate");
 
   eventView = require("../views/event");
+
+  Async = (function() {
+
+    function Async() {}
+
+    Async.prototype.counter = 0;
+
+    Async.prototype.add = function(name, method) {
+      this.counter += 1;
+      return this.fns[name] = method;
+    };
+
+    Async.prototype.fns = {};
+
+    Async.prototype.check = function() {
+      if (this.counter === 0) {
+        return this.finish();
+      }
+    };
+
+    Async.prototype.run = function(finish) {
+      var fn, name, _ref, _results,
+        _this = this;
+      this.finish = finish;
+      _ref = this.fns;
+      _results = [];
+      for (name in _ref) {
+        fn = _ref[name];
+        _results.push((function(name, fn) {
+          return fn(function(result) {
+            _this[name] = result;
+            _this.counter -= 1;
+            return _this.check();
+          });
+        })(name, fn));
+      }
+      return _results;
+    };
+
+    return Async;
+
+  })();
 
   module.exports = Router = (function(_super) {
 
@@ -352,55 +392,84 @@ window.require.define({"lib/router": function(exports, require, module) {
     };
 
     Router.prototype.contactEvent = function(cid, eid) {
-      var collection, event, model, view;
-      model = app.contacts.getOrFetch(cid);
-      event = app.events.getOrFetch(eid);
-      collection = app.records.getByContact(cid);
-      view = new contactEventView({
-        model: model,
-        event: event,
-        collection: collection
+      var async, collection,
+        _this = this;
+      async = new Async;
+      async.add("model", function(cb) {
+        return app.contacts.getOrFetch(cid, cb);
       });
-      return this.render(view);
+      async.add("event", function(cb) {
+        return app.events.getOrFetch(eid, cb);
+      });
+      collection = app.records.getByContact(cid);
+      return async.run(function() {
+        var view;
+        view = new contactEventView({
+          model: async.model,
+          event: async.event,
+          collection: collection
+        });
+        return _this.render(view);
+      });
     };
 
     Router.prototype.contact = function(cid) {
-      var collection, model, view;
-      model = app.contacts.getOrFetch(cid);
-      collection = app.records.getByContact(cid);
-      view = new contactView({
-        model: model,
-        collection: collection
+      var async, collection,
+        _this = this;
+      async = new Async;
+      async.add("model", function(cb) {
+        return app.contacts.getOrFetch(cid, cb);
       });
-      return this.render(view);
+      collection = app.records.getByContact(cid);
+      return async.run(function() {
+        var view;
+        view = new contactView({
+          model: async.model,
+          collection: collection
+        });
+        return _this.render(view);
+      });
     };
 
     Router.prototype.eventDate = function(eid, date) {
-      var collection, model, view;
-      model = app.events.getOrFetch(eid);
-      collection = app.records.getByEvent(eid).getByDate(date);
-      view = new eventDateView({
-        model: model,
-        collection: collection,
-        date: date
+      var async, collection, contacts,
+        _this = this;
+      async = new Async;
+      async.add("model", function(cb) {
+        return app.events.getOrFetch(eid, cb);
       });
-      window.dave3 = {
-        model: model,
-        collection: collection,
-        date: date
-      };
-      return this.render(view);
+      collection = app.records.getByEvent(eid).getByDate(date);
+      contacts = app.contacts.getByEvent(eid);
+      return async.run(function() {
+        var view;
+        view = new eventDateView({
+          model: async.model,
+          collection: collection,
+          contacts: contacts,
+          date: date
+        });
+        return _this.render(view);
+      });
     };
 
     Router.prototype.event = function(eid) {
-      var collection, model, view;
-      model = app.events.getOrFetch(eid);
-      collection = app.records.getByEvent(eid);
-      view = new eventView({
-        model: model,
-        collection: collection
+      var async, collection, contacts,
+        _this = this;
+      async = new Async;
+      async.add("model", function(cb) {
+        return app.events.getOrFetch(eid, cb);
       });
-      return this.render(view);
+      collection = app.records.getByEvent(eid);
+      contacts = app.contacts.getByEvent(eid);
+      return async.run(function() {
+        var view;
+        view = new eventView({
+          model: async.model,
+          collection: collection,
+          contacts: contacts
+        });
+        return _this.render(view);
+      });
     };
 
     Router.prototype.render = function(view) {
@@ -510,17 +579,30 @@ window.require.define({"models/collection": function(exports, require, module) {
       return Collection.__super__.constructor.apply(this, arguments);
     }
 
-    Collection.prototype.getOrFetch = function(id) {
-      var model;
+    Collection.prototype.getOrFetch = function(id, callback) {
+      var model,
+        _this = this;
       model = this.get(id);
-      if (!model) {
+      if (model) {
+        return callback(model);
+      } else {
         model = new this.model({
           id: id
         });
-        model.fetch();
-        this.add(model);
+        return model.fetch({
+          success: function() {
+            var cached;
+            cached = _this.get(id);
+            if (cached) {
+              cached.set(model.toJSON());
+              return callback(cached);
+            } else {
+              _this.add(model);
+              return callback(model);
+            }
+          }
+        });
       }
-      return model;
     };
 
     return Collection;
@@ -553,6 +635,10 @@ window.require.define({"models/contact": function(exports, require, module) {
       "delete": false
     };
 
+    ContactModel.prototype.defaults = {
+      event_ids: []
+    };
+
     return ContactModel;
 
   })(Model);
@@ -560,23 +646,99 @@ window.require.define({"models/contact": function(exports, require, module) {
 }});
 
 window.require.define({"models/contacts": function(exports, require, module) {
-  var Collection, Contact, Contacts,
+  var $, Collection, Contact, Contacts, eventFetches,
+    __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
     __hasProp = {}.hasOwnProperty,
-    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
+    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   Contact = require("./contact");
 
   Collection = require("./collection");
+
+  $ = cj;
+
+  eventFetches = [];
 
   module.exports = Contacts = (function(_super) {
 
     __extends(Contacts, _super);
 
     function Contacts() {
+      this.fetch = __bind(this.fetch, this);
       return Contacts.__super__.constructor.apply(this, arguments);
     }
 
     Contacts.prototype.model = Contact;
+
+    Contacts.prototype.makeChild = function() {
+      var child;
+      child = new Contacts;
+      child.App = this.App;
+      return child;
+    };
+
+    Contacts.prototype.getByEvent = function(event_id) {
+      var filtered;
+      filtered = this.makeChild();
+      if (__indexOf.call(eventFetches, event_id) >= 0) {
+        filtered.add(this.App.contacts.where({
+          event_id: event_id
+        }));
+      } else {
+        eventFetches.push(event_id);
+        this.fetch({
+          event_id: event_id
+        }, filtered);
+      }
+      return filtered;
+    };
+
+    Contacts.prototype.fetch = function(query, filtered) {
+      var base, url,
+        _this = this;
+      if (query == null) {
+        query = {};
+      }
+      base = Drupal.settings.basePath;
+      url = base + "civicrm/ajax/rest";
+      query.entity = "contact";
+      query.action = "get";
+      query.json = 1;
+      return $.getJSON(url, query, function(result) {
+        var contact, contacts, id, model, _results;
+        contacts = result.values;
+        if (_.isObject(contacts) && !_.isArray(contacts)) {
+          _results = [];
+          for (id in contacts) {
+            contact = contacts[id];
+            model = _this.App.contacts.get(contact.id);
+            if (model) {
+              model.get("event_ids").push(contact.event_id);
+              model.trigger("change", "event_id", contact.event_id);
+            } else {
+              contact.event_ids = [contact.event_id];
+              delete contact.event_id;
+              _this.App.contacts.add(contact);
+              model = _this.App.contacts.get(contact.id);
+            }
+            if (!_this.get(model.id)) {
+              _this.add(model);
+            }
+            if (filtered) {
+              if (!filtered.get(model.id)) {
+                _results.push(filtered.add(model));
+              } else {
+                _results.push(void 0);
+              }
+            } else {
+              _results.push(void 0);
+            }
+          }
+          return _results;
+        }
+      });
+    };
 
     return Contacts;
 
@@ -659,11 +821,19 @@ window.require.define({"models/model": function(exports, require, module) {
 }});
 
 window.require.define({"models/record": function(exports, require, module) {
-  var Model, RecordModel,
+  var Model, RecordModel, noop, stub,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
   Model = require("./model");
+
+  noop = function() {};
+
+  stub = {
+    toJSON: noop,
+    get: noop,
+    on: noop
+  };
 
   module.exports = RecordModel = (function(_super) {
 
@@ -691,15 +861,25 @@ window.require.define({"models/record": function(exports, require, module) {
       return data;
     };
 
+    RecordModel.prototype.relatedContact = stub;
+
+    RecordModel.prototype.relatedEvent = stub;
+
     RecordModel.prototype.initialize = function() {
       var _this = this;
-      this.relatedEvent = this.collection.App.events.getOrFetch(this.get("event_id"));
-      this.relatedEvent.on("change", function() {
-        return _this.trigger("change");
+      this.collection.App.events.getOrFetch(this.get("event_id"), function(model) {
+        _this.relatedEvent = model;
+        _this.relatedEvent.on("change", function() {
+          return _this.trigger("change");
+        });
+        return _this.relatedEvent.trigger("change");
       });
-      this.relatedContact = this.collection.App.contacts.getOrFetch(this.get("contact_id"));
-      return this.relatedContact.on("change", function() {
-        return _this.trigger("change");
+      return this.relatedContact = this.collection.App.contacts.getOrFetch(this.get("contact_id"), function(model) {
+        _this.relatedContact = model;
+        _this.relatedContact.on("change", function() {
+          return _this.trigger("change");
+        });
+        return _this.relatedContact.trigger("change");
       });
     };
 
@@ -740,7 +920,7 @@ window.require.define({"models/records": function(exports, require, module) {
     Records.prototype.makeChild = function() {
       var child;
       child = new Records;
-      child.app = this.app;
+      child.App = this.App;
       return child;
     };
 
@@ -1046,12 +1226,16 @@ window.require.define({"views/event": function(exports, require, module) {
 
     Event.prototype.template = template;
 
+    Event.prototype.init = function() {
+      return this.contactsOn("add remove", this.render);
+    };
+
     Event.prototype.getRenderData = function() {
       return {
         title: "Event Attendence Records",
         event: this.model.toJSON(),
         dates: this.collection.getDates(),
-        contacts: this.collection.getContacts()
+        contacts: this.options.contacts.toJSON()
       };
     };
 
@@ -1296,6 +1480,22 @@ window.require.define({"views/templates/event": function(exports, require, modul
     buffer += escapeExpression(stack1) + "</a></li>\n    ";
     return buffer;}
 
+  function program3(depth0,data) {
+    
+    var buffer = "", stack1;
+    buffer += "\n    <li><a href=\"#/contact/";
+    foundHelper = helpers.id;
+    stack1 = foundHelper || depth0.id;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "id", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "\">";
+    foundHelper = helpers.display_name;
+    stack1 = foundHelper || depth0.display_name;
+    if(typeof stack1 === functionType) { stack1 = stack1.call(depth0, { hash: {} }); }
+    else if(stack1=== undef) { stack1 = helperMissing.call(depth0, "display_name", { hash: {} }); }
+    buffer += escapeExpression(stack1) + "</a></li>\n    ";
+    return buffer;}
+
     buffer += "<h1>";
     foundHelper = helpers.title;
     stack1 = foundHelper || depth0.title;
@@ -1312,6 +1512,16 @@ window.require.define({"views/templates/event": function(exports, require, modul
     stack1 = foundHelper || depth0.dates;
     stack2 = helpers.each;
     tmp1 = self.programWithDepth(program1, data, depth0);
+    tmp1.hash = {};
+    tmp1.fn = tmp1;
+    tmp1.inverse = self.noop;
+    stack1 = stack2.call(depth0, stack1, tmp1);
+    if(stack1 || stack1 === 0) { buffer += stack1; }
+    buffer += "\n</ul>\n<a href=\"#\" class=\"add_date\">Add Date</a>\n<hr>\n\n<ul>\n    ";
+    foundHelper = helpers.contacts;
+    stack1 = foundHelper || depth0.contacts;
+    stack2 = helpers.each;
+    tmp1 = self.program(3, program3, data);
     tmp1.hash = {};
     tmp1.fn = tmp1;
     tmp1.inverse = self.noop;
@@ -1417,8 +1627,11 @@ window.require.define({"views/view": function(exports, require, module) {
     View.prototype.initialize = function(options) {
       this.init(options);
       this.modelOn("change", this.render);
-      this.collectionOn("change", this.render);
-      return this.eventOn("change", this.render);
+      this.collectionOn("change add remove", this.render);
+      this.eventOn("change", this.render);
+      return this.collectionOn("all", function() {
+        return console.log(arguments);
+      });
     };
 
     View.prototype.modelOn = function(event, callback) {
@@ -1433,11 +1646,16 @@ window.require.define({"views/view": function(exports, require, module) {
 
     View.prototype.eventOn = function(event, callback) {
       var _ref;
-      return (_ref = this.event) != null ? _ref.on(event, callback, this) : void 0;
+      return (_ref = this.options.event) != null ? _ref.on(event, callback, this) : void 0;
+    };
+
+    View.prototype.contactsOn = function(event, callback) {
+      var _ref;
+      return (_ref = this.options.contacts) != null ? _ref.on(event, callback, this) : void 0;
     };
 
     View.prototype.dispose = function() {
-      var _ref, _ref1, _ref2;
+      var _ref, _ref1, _ref2, _ref3;
       if ((_ref = this.model) != null) {
         _ref.off(null, null, this);
       }
@@ -1446,6 +1664,9 @@ window.require.define({"views/view": function(exports, require, module) {
       }
       if ((_ref2 = this.options.event) != null) {
         _ref2.off(null, null, this);
+      }
+      if ((_ref3 = this.options.contact) != null) {
+        _ref3.off(null, null, this);
       }
       return this.remove();
     };

@@ -1,4 +1,9 @@
 Model = require "./model"
+noop = ->
+stub =
+  toJSON: noop
+  get: noop
+  on: noop
 
 module.exports = class RecordModel extends Model
   methodMap:
@@ -15,11 +20,22 @@ module.exports = class RecordModel extends Model
       data.date = data.date.toString("yyyy-MM-dd")
     data
 
+  relatedContact: stub
+  relatedEvent: stub
+
+
+
   initialize: ->
-    @relatedEvent = @collection.App.events.getOrFetch(@get "event_id")
-    @relatedEvent.on "change", => @trigger "change"
-    @relatedContact = @collection.App.contacts.getOrFetch(@get "contact_id")
-    @relatedContact.on "change", => @trigger "change"
+    @collection.App.events.getOrFetch @get("event_id"), (model) =>
+      @relatedEvent = model
+      @relatedEvent.on "change", => @trigger "change"
+      @relatedEvent.trigger "change"
+
+    @relatedContact = @collection.App.contacts.getOrFetch @get("contact_id"), (model) =>
+      @relatedContact = model
+      @relatedContact.on "change", => @trigger "change"
+      @relatedContact.trigger "change"
+
 
 
 

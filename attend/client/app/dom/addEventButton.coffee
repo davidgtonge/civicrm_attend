@@ -9,4 +9,3 @@ cj ->
   container.find('#sc_attend').click ->
     window.location.hash = "/event/#{id}"
     require "../initialize"
-    alert "show attedance for eid: #{id}"

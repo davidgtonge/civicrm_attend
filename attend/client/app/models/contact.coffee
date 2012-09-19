@@ -8,4 +8,7 @@ module.exports = class ContactModel extends Model
     read: "get"
     delete: false
 
+  defaults:
+    event_ids:[]
+
 
