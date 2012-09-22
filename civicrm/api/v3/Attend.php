@@ -414,7 +414,6 @@ function civicrm_api3_attend_set_contact_record($params){
     if(array_key_exists('contact_id',$params)) $bao->contact_id = $params['contact_id'];
     if(array_key_exists('date',$params)) $bao->date = $params['date'];
     $bao->save();
-    dpm($bao);
     return _civicrm_api3_dao_to_array ($bao);
 
 }
@@ -432,13 +431,7 @@ function civicrm_api3_attend_delete_event_record($params) {
 }
 
 
-  
-// Retrieves events that have the getEvents flag
-function civicrm_api3_attend_getEvents($params){
-  
 
-  return array();
-}
 // Set the attend flag for an event
 function civicrm_api3_attend_setEventFlag($params){
   $event_id = $params['event_id'];
@@ -458,11 +451,10 @@ function civicrm_api3_attend_setEventFlag($params){
     }
   }
 
-
-
-
   return true;
 }
+
+
 // Gets the attend flag for an event
 function civicrm_api3_attend_getEventFlag($params){
   $event_id = $params['event_id'];
@@ -483,80 +475,3 @@ function civicrm_api3_attend_getEventFlag($params){
   // Return 0 by default
   return 0;
 }
-
-// Gets attendance information
-// Optionally filtered by contact
-// Optionally filtered by an event
-// Optionally filtered by date
-function civicrm_api3_attend_get($params){
-  return "civi api attend get" . $params;
-}
-
-function civi_attend_get_contact_data($cid){
-    $query = "
-      SELECT *
-      FROM   civicrm_attend_contact
-      WHERE  contact_id='$cid'
-      LIMIT 1000
-    ";
-
-    # run the query
-    $dao = CRM_Core_DAO::executeQuery( $query );
-    $results = array();
-    while($dao->fetch()){
-        $results[] = array(
-            'eid' => $dao->event_id,
-            'date' => $dao->date,
-            'id' => $dao->id
-        );
-    }
-    return $results;
-}
-
-function civi_attend_insert_contact_data($cid, $date, $eid){
-    $query = "
-      INSERT INTO civicrm_attend_contact (event_id, date, contact_id,...)
-      VALUES ($eid, $date, $cid)
-    ";
-
-    # run the query
-    $dao = CRM_Core_DAO::executeQuery( $query );
-    $results = array();
-    while($dao->fetch()){
-        $results[] = array(
-            'eid' => $dao->event_id,
-            'date' => $dao->date,
-            'id' => $dao->id
-        );
-    }
-    return $results;
-}
-
-/*
-function civicrm_api3_attend_getcontact($params){
-    require_once 'api/api.php';
-    $id = $params['id'];
-    $contact = civicrm_api( 'contact','getsingle',array('id' => $id, 'version' => 3) );
-    $contact['results'] = civi_attend_get_contact_data($id);
-    return $contact;
-
-}
-function civicrm_api3_attend_setcontact($params){
-    $id = $params['id'];
-    $updated = array();
-    foreach($params['result'] as $item){
-        if($item['id']){
-            $updated[] = civi_attend_update_contact_data($id, $item);
-        } else {
-             $updated[] = civi_attend_insert_contact_data($id, $item);
-        }
-    }
-    require_once 'api/api.php';
-    $contact = civicrm_api( 'contact','getsingle',array('id' => $id, 'version' => 3) );
-    $contact['results'] = $updated;
-    return $contact;
-
-
-}
-*/
-

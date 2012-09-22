@@ -1,26 +1,5 @@
 <?php 
 
-// Event Edit - Add the option to track attendence
-// Now need to save this to the database.
-//
-// I think for the other stuff its best that we build an api
-// Add a new entity type - Attendence
-// Then we can do some nice querying of data,
-// by form, by date, by person
-// We can then display this fairly easily
-// So the next step is to create the api
-//
-// Event Detail Page - Click to load and edit attendence (perhaps via ajax)
-//
-// Contact Page - Make a new Attendence Tab
-// 
-//
-//
-
-
-error_reporting(E_ALL);
-
-
 function civiattend_civicrm_buildForm($formName, &$form) {
 
   if($formName == "CRM_Event_Form_ManageEvent_EventInfo"){
@@ -63,30 +42,9 @@ function civiattend_civicrm_alterContent(&$content, $context, $tplName){
         case "CRM/Contact/Page/View/Summary.tpl":
             $content .= $scripts . "<script>require('dom/addContactButton');</script>";
 
-
     }
-
-    dpm($tplName);
-
 }
 
-# Database
-# Three New Tables
-# One with event metadata
-# One contains:
-# event_id, is_attend_flag
-#
-# So lets just use the two tables
-# But when we get event data we do a query for all dates for that event
-#
-# array of dates  
-#
-# Other contains:
-# event_id, date, contact_id
-#
-#
-#
-#
-#
+
 
 
